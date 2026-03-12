@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Itim&family=Kanit:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Kanit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Itim", cursive;
+  
+  --color-pastel-mint: #e0f2f1;
+  --color-pastel-peach: #fff3e0;
+  --color-pastel-lavender: #f3e5f5;
+  --color-pastel-pink: #fce4ec;
+  --color-pastel-blue: #e3f2fd;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-pastel-blue/30 text-stone-800;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: theme('colors.emerald.400 / 20%');
+    border-radius: 100px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: theme('colors.emerald.400 / 40%');
+  }
+
+  /* Firefox support */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.emerald.400 / 20%') transparent;
+  }
+}
+
+.glass {
+  @apply bg-white/60 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+}
+
+.glass-dark {
+  @apply bg-black/10 backdrop-blur-md border border-white/10;
+}
+
+.bubble-shadow {
+  @apply shadow-[0_10px_20px_rgba(0,0,0,0.05),inset_0_-4px_8px_rgba(0,0,0,0.05)];
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
