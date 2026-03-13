@@ -6,7 +6,7 @@ import { BouncyButton } from '../ui/BouncyButton';
 import { User, Loader2, ArrowLeft, HeartHandshake } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export const LinkPartnerScreen = ({ profile, onLinked, onLogout }: { profile: Profile, onLinked: () => void, onLogout: () => void }) => {
+export const LinkPartnerScreen = ({ profile, onLinked, onLogout }: { key?: React.Key, profile: Profile, onLinked: () => void, onLogout: () => void }) => {
   const [partnerEmail, setPartnerEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +38,7 @@ export const LinkPartnerScreen = ({ profile, onLinked, onLogout }: { profile: Pr
         return;
       }
 
-      if (partnerData.partner_id) {
+      if (partnerData.partner_id && partnerData.partner_id !== profile.id) {
         setError('แฟนคนนี้เชื่อมต่อกับคนอื่นอยู่แล้วน้าา');
         return;
       }
@@ -48,12 +48,7 @@ export const LinkPartnerScreen = ({ profile, onLinked, onLogout }: { profile: Pr
         .update({ partner_id: partnerData.id })
         .eq('id', profile.id);
 
-      const { error: updatePartner } = await supabase
-        .from('profiles')
-        .update({ partner_id: profile.id })
-        .eq('id', partnerData.id);
-
-      if (updateMe || updatePartner) throw new Error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      if (updateMe) throw new Error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
 
       onLinked();
     } catch (err: any) {

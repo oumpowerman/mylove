@@ -3,11 +3,12 @@ import { supabase } from '@/src/lib/supabase';
 import { Expense, Profile, Settlement } from '@/src/types';
 import { BouncyButton } from '../ui/BouncyButton';
 import { ExpenseItem } from '../dashboard/Dashboard';
-import { ChevronLeft, Trash2, Receipt, History as HistoryIcon, CheckCircle2, Wallet } from 'lucide-react';
+import { ChevronLeft, Trash2, Receipt, History as HistoryIcon, CheckCircle2, Wallet, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { cn } from '@/src/lib/utils';
+import { ImagePreviewModal } from '../ui/ImagePreviewModal';
 
 interface HistoryViewProps {
   key?: React.Key;
@@ -15,19 +16,41 @@ interface HistoryViewProps {
   profile: Profile;
   partner: Profile;
   onBack: () => void;
-  onDelete: (id: string) => void;
+  onDelete: (expense: Expense) => void;
+  onEdit: (expense: Expense) => void;
 }
 
-export const HistoryView = ({ expenses, profile, partner, onBack, onDelete }: HistoryViewProps) => {
+export const HistoryView = ({ expenses, profile, partner, onBack, onDelete, onEdit }: HistoryViewProps) => {
   const [activeTab, setActiveTab] = useState<'current' | 'settled' | 'settlements'>('current');
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loadingSettlements, setLoadingSettlements] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === 'settlements') {
       fetchSettlements();
+
+      // Real-time subscription for settlements
+      const channel = supabase
+        .channel('settlements_realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'settlements',
+          },
+          () => {
+            fetchSettlements();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
-  }, [activeTab]);
+  }, [activeTab, profile.id, partner.id]);
 
   const fetchSettlements = async () => {
     setLoadingSettlements(true);
@@ -80,13 +103,27 @@ export const HistoryView = ({ expenses, profile, partner, onBack, onDelete }: Hi
             <motion.div key="current" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               {currentExpenses.map(exp => (
                 <div key={exp.id} className="relative group">
-                  <ExpenseItem expense={exp} profile={profile} partner={partner} />
-                  <button 
-                    onClick={() => { if (confirm('ลบรายการนี้ใช่ไหมน้าา?')) onDelete(exp.id); }}
-                    className="absolute -right-2 -top-2 w-10 h-10 bg-rose-400 text-white rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg border-2 border-white"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <ExpenseItem 
+                    expense={exp} 
+                    profile={profile} 
+                    partner={partner} 
+                    onClick={() => onEdit(exp)}
+                    onPreview={(url) => setPreviewUrl(url)}
+                  />
+                  <div className="absolute -right-2 -top-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => onEdit(exp)}
+                      className="w-10 h-10 bg-emerald-400 text-white rounded-2xl flex items-center justify-center shadow-lg border-2 border-white"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => onDelete(exp)}
+                      className="w-10 h-10 bg-rose-400 text-white rounded-2xl flex items-center justify-center shadow-lg border-2 border-white"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               ))}
               {currentExpenses.length === 0 && <EmptyState icon={<Receipt className="w-16 h-16" />} text="ยังไม่มีรายการที่ค้างอยู่น้าา" />}
@@ -97,7 +134,12 @@ export const HistoryView = ({ expenses, profile, partner, onBack, onDelete }: Hi
             <motion.div key="settled" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               {settledExpenses.map(exp => (
                 <div key={exp.id} className="opacity-70 grayscale-[0.5]">
-                  <ExpenseItem expense={exp} profile={profile} partner={partner} />
+                  <ExpenseItem 
+                    expense={exp} 
+                    profile={profile} 
+                    partner={partner} 
+                    onPreview={(url) => setPreviewUrl(url)}
+                  />
                 </div>
               ))}
               {settledExpenses.length === 0 && <EmptyState icon={<CheckCircle2 className="w-16 h-16" />} text="ยังไม่มีรายการที่เคลียร์แล้วจ้าา" />}
@@ -107,13 +149,25 @@ export const HistoryView = ({ expenses, profile, partner, onBack, onDelete }: Hi
           {activeTab === 'settlements' && (
             <motion.div key="settlements" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
               {settlements.map(settle => (
-                <SettlementItem key={settle.id} settlement={settle} profile={profile} partner={partner} />
+                <SettlementItem 
+                  key={settle.id} 
+                  settlement={settle} 
+                  profile={profile} 
+                  partner={partner} 
+                  onPreview={(url) => setPreviewUrl(url)}
+                />
               ))}
               {settlements.length === 0 && !loadingSettlements && <EmptyState icon={<HistoryIcon className="w-16 h-16" />} text="ยังไม่มีประวัติการโอนจ้าา" />}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      <ImagePreviewModal 
+        isOpen={!!previewUrl}
+        onClose={() => setPreviewUrl(null)}
+        imageUrl={previewUrl || ''}
+      />
     </motion.div>
   );
 };
@@ -146,7 +200,7 @@ function EmptyState({ icon, text }: { icon: React.ReactNode, text: string }) {
   );
 }
 
-function SettlementItem({ settlement, profile, partner }: { key?: React.Key, settlement: Settlement, profile: Profile, partner: Profile }) {
+function SettlementItem({ settlement, profile, partner, onPreview }: { key?: React.Key, settlement: Settlement, profile: Profile, partner: Profile, onPreview: (url: string) => void }) {
   const isFromMe = settlement.from_user_id === profile.id;
   
   return (
@@ -164,9 +218,20 @@ function SettlementItem({ settlement, profile, partner }: { key?: React.Key, set
           </p>
         </div>
       </div>
-      <div className="text-right">
+      <div className="text-right flex flex-col items-end gap-2">
         <p className="font-display text-2xl text-emerald-600">฿{settlement.amount.toLocaleString()}</p>
-        <p className="text-[10px] font-bold text-stone-300 font-sans uppercase tracking-tighter">สำเร็จ ✨</p>
+        <div className="flex items-center gap-2">
+          {settlement.proof_url && (
+            <button 
+              onClick={() => onPreview(settlement.proof_url!)} 
+              className="p-1.5 bg-emerald-50 text-emerald-500 rounded-lg hover:bg-emerald-100 transition-colors"
+              title="ดูสลิปการโอน"
+            >
+              <Receipt className="w-4 h-4" />
+            </button>
+          )}
+          <p className="text-[10px] font-bold text-stone-300 font-sans uppercase tracking-tighter">สำเร็จ ✨</p>
+        </div>
       </div>
     </div>
   );

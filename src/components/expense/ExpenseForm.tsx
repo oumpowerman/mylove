@@ -1,23 +1,54 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '@/src/lib/supabase';
+import { GoogleDriveService } from '@/src/services/googleDriveService';
 import { Profile } from '@/src/types';
 import { GlassCard } from '../ui/GlassCard';
 import { BouncyButton } from '../ui/BouncyButton';
-import { Camera, X, Loader2, Sparkles, Receipt } from 'lucide-react';
+import { Camera, X, Loader2, Sparkles, Receipt, Save, Cloud } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { handleFirestoreError, OperationType } from '@/src/lib/error-handler';
+import { Expense } from '@/src/types';
 
-export const ExpenseForm = ({ profile, partner, onClose, onSuccess }: { key?: React.Key, profile: Profile, partner: Profile, onClose: () => void, onSuccess: () => void }) => {
-  const [description, setDescription] = useState('');
-  const [notes, setNotes] = useState('');
-  const [amount, setAmount] = useState('');
-  const [splitType, setSplitType] = useState<'equal' | 'custom'>('equal');
-  const [customShare, setCustomShare] = useState('');
+export const ExpenseForm = ({ 
+  profile, 
+  partner, 
+  onClose, 
+  onSuccess,
+  initialData
+}: { 
+  key?: React.Key, 
+  profile: Profile, 
+  partner: Profile, 
+  onClose: () => void, 
+  onSuccess: () => void,
+  initialData?: Expense | null
+}) => {
+  const [description, setDescription] = useState(initialData?.description || '');
+  const [notes, setNotes] = useState(initialData?.notes || '');
+  const [amount, setAmount] = useState(initialData?.amount.toString() || '');
+  const [splitType, setSplitType] = useState<'equal' | 'custom'>(
+    initialData ? (initialData.other_share === initialData.amount / 2 ? 'equal' : 'custom') : 'equal'
+  );
+  const [customShare, setCustomShare] = useState(initialData?.other_share.toString() || '');
   const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.receipt_url || null);
   const [loading, setLoading] = useState(false);
+  const [gdStatus, setGdStatus] = useState<'idle' | 'authenticating' | 'authenticated' | 'error'>(
+    GoogleDriveService.isAuthenticated() ? 'authenticated' : 'idle'
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleConnectGD = async () => {
+    setGdStatus('authenticating');
+    try {
+      await GoogleDriveService.authenticate();
+      setGdStatus('authenticated');
+    } catch (err) {
+      console.error('GD Auth Error:', err);
+      setGdStatus('error');
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,36 +66,68 @@ export const ExpenseForm = ({ profile, partner, onClose, onSuccess }: { key?: Re
     setLoading(true);
 
     try {
-      let receipt_url = null;
+      let receipt_url = initialData?.receipt_url || null;
       if (image) {
-        const fileExt = image.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from('receipts')
-          .upload(fileName, image);
-        
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
-        receipt_url = publicUrl;
+        if (GoogleDriveService.isConfigured()) {
+          try {
+            if (!GoogleDriveService.isAuthenticated()) {
+              await GoogleDriveService.authenticate();
+            }
+            receipt_url = await GoogleDriveService.uploadFile(image);
+          } catch (err) {
+            console.error('Google Drive upload failed, falling back to Supabase:', err);
+            // Fallback to Supabase
+            const fileExt = image.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+              .from('receipts')
+              .upload(fileName, image);
+            
+            if (uploadError) throw uploadError;
+            const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
+            receipt_url = publicUrl;
+          }
+        } else {
+          // Default to Supabase if GD not configured
+          const fileExt = image.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from('receipts')
+            .upload(fileName, image);
+          
+          if (uploadError) throw uploadError;
+          const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(fileName);
+          receipt_url = publicUrl;
+        }
       }
 
       const totalAmount = parseFloat(amount);
       const otherShare = splitType === 'equal' ? totalAmount / 2 : parseFloat(customShare);
 
-      const { error } = await supabase.from('expenses').insert({
-        payer_id: profile.id,
+      const expenseData = {
+        payer_id: initialData?.payer_id || profile.id,
         amount: totalAmount,
         description,
         notes: notes.trim() || null,
         receipt_url,
-        other_user_id: partner.id,
+        other_user_id: initialData?.other_user_id || partner.id,
         other_share: otherShare
-      });
+      };
 
-      if (error) throw error;
+      if (initialData) {
+        const { error } = await supabase
+          .from('expenses')
+          .update(expenseData)
+          .eq('id', initialData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('expenses').insert(expenseData);
+        if (error) throw error;
+      }
+
       onSuccess();
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'expenses');
+      handleFirestoreError(err, initialData ? OperationType.UPDATE : OperationType.CREATE, 'expenses');
     } finally {
       setLoading(false);
     }
@@ -73,7 +136,9 @@ export const ExpenseForm = ({ profile, partner, onClose, onSuccess }: { key?: Re
   return (
     <GlassCard className="p-8 border-none shadow-2xl">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-3xl font-display text-stone-800">เพิ่มรายการใหม่ ✨</h2>
+        <h2 className="text-3xl font-display text-stone-800">
+          {initialData ? 'แก้ไขรายการ ✨' : 'เพิ่มรายการใหม่ ✨'}
+        </h2>
         <BouncyButton variant="ghost" onClick={onClose} className="p-2 rounded-full">
           <X className="w-6 h-6" />
         </BouncyButton>
@@ -81,29 +146,57 @@ export const ExpenseForm = ({ profile, partner, onClose, onSuccess }: { key?: Re
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Image Upload */}
-        <motion.div 
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => fileInputRef.current?.click()}
-          className="relative w-full aspect-video bg-white/40 rounded-[2rem] border-4 border-dashed border-white flex flex-col items-center justify-center cursor-pointer overflow-hidden group shadow-inner"
-        >
-          {imagePreview ? (
-            <>
-              <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-display text-xl gap-2">
-                <Camera className="w-6 h-6" /> เปลี่ยนรูปจ้า
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-2">
+            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">แนบใบเสร็จ (ถ้ามี)</label>
+            {GoogleDriveService.isConfigured() && (
+              <div className="flex items-center gap-1.5">
+                {gdStatus === 'authenticated' ? (
+                  <div className="flex items-center gap-1 text-[9px] text-emerald-500 font-bold uppercase tracking-widest">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                    GD Connected
+                  </div>
+                ) : gdStatus === 'authenticating' ? (
+                  <div className="flex items-center gap-1 text-[9px] text-stone-400 font-bold uppercase tracking-widest">
+                    <Loader2 className="w-2 h-2 animate-spin" />
+                    Connecting...
+                  </div>
+                ) : (
+                  <button 
+                    type="button"
+                    onClick={handleConnectGD}
+                    className="text-[9px] text-rose-400 font-bold uppercase tracking-widest hover:underline"
+                  >
+                    Link Google Drive 🔗
+                  </button>
+                )}
               </div>
-            </>
-          ) : (
-            <>
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-stone-300 mb-3 shadow-sm">
-                <Camera className="w-8 h-8" />
-              </div>
-              <p className="text-stone-400 font-display text-lg">แนบใบเสร็จหน่อยน้าา</p>
-            </>
-          )}
-          <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
-        </motion.div>
+            )}
+          </div>
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => fileInputRef.current?.click()}
+            className="relative w-full aspect-video bg-white/40 rounded-[2rem] border-4 border-dashed border-white flex flex-col items-center justify-center cursor-pointer overflow-hidden group shadow-inner"
+          >
+            {imagePreview ? (
+              <>
+                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-display text-xl gap-2">
+                  <Camera className="w-6 h-6" /> เปลี่ยนรูปจ้า
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-stone-300 mb-3 shadow-sm">
+                  <Camera className="w-8 h-8" />
+                </div>
+                <p className="text-stone-400 font-display text-lg">แนบใบเสร็จหน่อยน้าา</p>
+              </>
+            )}
+            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
+          </motion.div>
+        </div>
 
         <div className="space-y-5">
           <div className="space-y-1">

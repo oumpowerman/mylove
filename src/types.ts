@@ -28,6 +28,7 @@ export interface Settlement {
   to_user_id: string;
   amount: number;
   notes: string | null;
+  proof_url: string | null;
 }
 
 export interface Message {

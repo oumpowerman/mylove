@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { ImagePreviewModal } from '../ui/ImagePreviewModal';
 
 interface DashboardProps {
   key?: React.Key;
@@ -25,9 +26,10 @@ interface DashboardProps {
   onAdd: () => void;
   onSeeAll: () => void;
   onSettle: (unsettled: Expense[]) => void;
+  onEdit: (expense: Expense) => void;
 }
 
-export const Dashboard = ({ profile, partner, expenses, onAdd, onSeeAll, onSettle }: DashboardProps) => {
+export const Dashboard = ({ profile, partner, expenses, onAdd, onSeeAll, onSettle, onEdit }: DashboardProps) => {
   const unsettledExpenses = expenses.filter(e => !e.is_settled);
 
   const calculateBalance = (): Balance => {
@@ -56,6 +58,7 @@ export const Dashboard = ({ profile, partner, expenses, onAdd, onSeeAll, onSettl
   };
 
   const balance = calculateBalance();
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
   return (
     <motion.div 
@@ -137,7 +140,14 @@ export const Dashboard = ({ profile, partner, expenses, onAdd, onSeeAll, onSettl
         
         <div className="space-y-4">
           {expenses.slice(0, 5).map(exp => (
-            <ExpenseItem key={exp.id} expense={exp} profile={profile} partner={partner} />
+            <ExpenseItem 
+              key={exp.id} 
+              expense={exp} 
+              profile={profile} 
+              partner={partner} 
+              onClick={() => !exp.is_settled && onEdit(exp)}
+              onPreview={(url) => setPreviewUrl(url)}
+            />
           ))}
           {expenses.length === 0 && (
             <div className="text-center py-16 glass rounded-[2.5rem] border-2 border-dashed border-white/60">
@@ -149,17 +159,27 @@ export const Dashboard = ({ profile, partner, expenses, onAdd, onSeeAll, onSettl
           )}
         </div>
       </div>
+
+      <ImagePreviewModal 
+        isOpen={!!previewUrl}
+        onClose={() => setPreviewUrl(null)}
+        imageUrl={previewUrl || ''}
+      />
     </motion.div>
   );
 };
 
-export function ExpenseItem({ expense, profile, partner }: { key?: React.Key, expense: Expense, profile: Profile, partner: Profile }) {
+export function ExpenseItem({ expense, profile, partner, onClick, onPreview }: { key?: React.Key, expense: Expense, profile: Profile, partner: Profile, onClick?: () => void, onPreview?: (url: string) => void }) {
   const isMe = expense.payer_id === profile.id;
   
   return (
     <motion.div 
       whileHover={{ scale: 1.02, y: -2 }}
-      className="glass p-4 rounded-3xl flex items-center justify-between group cursor-pointer"
+      onClick={onClick}
+      className={cn(
+        "glass p-4 rounded-3xl flex items-center justify-between group cursor-pointer transition-all",
+        onClick && "hover:bg-white/40"
+      )}
     >
       <div className="flex items-center gap-4">
         <div className={cn(
@@ -182,11 +202,25 @@ export function ExpenseItem({ expense, profile, partner }: { key?: React.Key, ex
         </div>
         <div>
           <h4 className="font-display text-xl text-stone-800 leading-tight">{expense.description}</h4>
-          {expense.notes && (
-            <p className="text-xs text-stone-500 font-sans mt-0.5 line-clamp-1 italic">
-              "{expense.notes}"
-            </p>
-          )}
+          <div className="flex items-center gap-2 mt-0.5">
+            {expense.notes && (
+              <p className="text-xs text-stone-500 font-sans line-clamp-1 italic">
+                "{expense.notes}"
+              </p>
+            )}
+            {expense.receipt_url && onPreview && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPreview(expense.receipt_url!);
+                }}
+                className="p-1 bg-stone-100 text-stone-400 rounded-md hover:bg-stone-200 hover:text-stone-600 transition-colors"
+                title="ดูรูปใบเสร็จ"
+              >
+                <Receipt className="w-3 h-3" />
+              </button>
+            )}
+          </div>
           <p className="text-[10px] text-stone-400 font-bold font-sans uppercase tracking-wider mt-1">
             {isMe ? 'คุณจ่าย' : `${partner?.display_name || 'แฟน'} จ่าย`} • {format(new Date(expense.created_at), 'd MMM yy', { locale: th })}
           </p>
