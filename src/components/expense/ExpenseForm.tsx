@@ -181,7 +181,12 @@ export const ExpenseForm = ({
           >
             {imagePreview ? (
               <>
-                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
                 <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-display text-xl gap-2">
                   <Camera className="w-6 h-6" /> เปลี่ยนรูปจ้า
                 </div>

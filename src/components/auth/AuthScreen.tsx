@@ -115,8 +115,8 @@ export const AuthScreen = ({ setAuthLoading, authLoading }: { setAuthLoading: (v
           >
             <Heart className="w-8 h-8 fill-current" />
           </motion.div>
-          <h1 className="text-3xl font-display text-stone-800 tracking-tight">DuoPay</h1>
-          <p className="text-stone-500 font-sans text-xs mt-1">หารตังกับแฟนแบบตะมุตะมิ ✨</p>
+          <h1 className="text-3xl font-display text-stone-800 tracking-tight">HoneyMoney</h1>
+          <p className="text-stone-500 font-sans text-xs mt-1">แอปบันทึกค่าใช้จ่ายสุดคิวท์สำหรับคู่รัก 💖</p>
         </div>
 
         <AnimatePresence mode="wait">

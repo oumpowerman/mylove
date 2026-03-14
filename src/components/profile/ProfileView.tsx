@@ -14,20 +14,35 @@ export const ProfileView = ({ profile, partner, onLogout, onBack }: { key?: Reac
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [gdStatus, setGdStatus] = useState<'idle' | 'authenticating' | 'authenticated' | 'error'>(
+    GoogleDriveService.isAuthenticated() ? 'authenticated' : 'idle'
+  );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleConnectGD = async () => {
+    setGdStatus('authenticating');
+    try {
+      await GoogleDriveService.authenticate();
+      setGdStatus('authenticated');
+    } catch (err: any) {
+      console.error('GD Auth Error:', err);
+      setGdStatus('error');
+      alert(err.message || 'ไม่สามารถเชื่อมต่อ Google Drive ได้');
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!GoogleDriveService.isAuthenticated()) {
+      alert('กรุณาเชื่อมต่อ Google Drive ก่อนอัปโหลดน้าา');
+      return;
+    }
+
     setUploading(true);
     try {
-      // 1. Authenticate if needed
-      if (!GoogleDriveService.isAuthenticated()) {
-        await GoogleDriveService.authenticate();
-      }
-
-      // 2. Upload to Google Drive
+      // Upload to Google Drive
       const directUrl = await GoogleDriveService.uploadFile(file);
       
       // 3. Update state
@@ -114,7 +129,12 @@ export const ProfileView = ({ profile, partner, onLogout, onBack }: { key?: Reac
                   <Loader2 className="w-8 h-8 animate-spin text-white" />
                 </div>
               ) : avatarUrl ? (
-                <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                <img 
+                  src={avatarUrl} 
+                  alt={displayName} 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 displayName?.charAt(0).toUpperCase() || <User className="w-12 h-12" />
               )}
@@ -155,7 +175,32 @@ export const ProfileView = ({ profile, partner, onLogout, onBack }: { key?: Reac
                   />
                 </div>
                 <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest ml-2">ลิงก์รูปโปรไฟล์ (URL)</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest ml-2">ลิงก์รูปโปรไฟล์ (URL)</label>
+                    {GoogleDriveService.isConfigured() && (
+                      <div className="flex items-center gap-1.5">
+                        {gdStatus === 'authenticated' ? (
+                          <div className="flex items-center gap-1 text-[9px] text-emerald-500 font-bold uppercase tracking-widest">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                            GD Connected
+                          </div>
+                        ) : gdStatus === 'authenticating' ? (
+                          <div className="flex items-center gap-1 text-[9px] text-stone-400 font-bold uppercase tracking-widest">
+                            <Loader2 className="w-2 h-2 animate-spin" />
+                            Connecting...
+                          </div>
+                        ) : (
+                          <button 
+                            type="button"
+                            onClick={handleConnectGD}
+                            className="text-[9px] text-rose-400 font-bold uppercase tracking-widest hover:underline"
+                          >
+                            Link Google Drive 🔗
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <input 
                     type="url"
                     value={avatarUrl}
@@ -205,7 +250,12 @@ export const ProfileView = ({ profile, partner, onLogout, onBack }: { key?: Reac
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-300 text-xl font-display shadow-sm border border-rose-50 overflow-hidden">
                 {partner?.avatar_url ? (
-                  <img src={partner.avatar_url} alt={partner?.display_name || ''} className="w-full h-full object-cover" />
+                  <img 
+                    src={partner.avatar_url} 
+                    alt={partner?.display_name || ''} 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
                 ) : (
                   partner?.display_name?.charAt(0).toUpperCase()
                 )}

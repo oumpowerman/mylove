@@ -61,6 +61,7 @@ export class GoogleDriveService {
         client_id: CLIENT_ID,
         scope: SCOPES,
         callback: (response: any) => {
+          console.log('Google Auth Response:', response);
           if (response.error) {
             reject(new Error(response.error_description || response.error));
             return;
@@ -68,10 +69,19 @@ export class GoogleDriveService {
           this.accessToken = response.access_token;
           resolve(response.access_token);
         },
+        error_callback: (err: any) => {
+          console.error('Google Auth Error Callback:', err);
+          reject(new Error('Google Authentication failed to initialize'));
+        }
       });
       
-      // This call triggers the popup and MUST be within a user gesture handler
-      client.requestAccessToken();
+      try {
+        // This call triggers the popup and MUST be within a user gesture handler
+        client.requestAccessToken();
+      } catch (err) {
+        console.error('Request Access Token Error:', err);
+        reject(new Error('Failed to open Google login popup. Please check if popups are blocked.'));
+      }
     });
   }
 

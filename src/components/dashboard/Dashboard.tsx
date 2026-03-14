@@ -188,13 +188,23 @@ export function ExpenseItem({ expense, profile, partner, onClick, onPreview }: {
         )}>
           {isMe ? (
             profile.avatar_url ? (
-              <img src={profile.avatar_url} alt="Me" className="w-full h-full object-cover" />
+              <img 
+                src={profile.avatar_url} 
+                alt="Me" 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+              />
             ) : (
               <User className="w-7 h-7" />
             )
           ) : (
             partner.avatar_url ? (
-              <img src={partner.avatar_url} alt="Partner" className="w-full h-full object-cover" />
+              <img 
+                src={partner.avatar_url} 
+                alt="Partner" 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+              />
             ) : (
               <User className="w-7 h-7" />
             )

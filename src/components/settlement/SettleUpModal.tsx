@@ -169,9 +169,25 @@ export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, on
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-16 h-16 rounded-2xl bg-white shadow-sm border border-stone-100 flex items-center justify-center overflow-hidden">
                         {isMePaying ? (
-                          profile.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <Wallet className="w-8 h-8 text-stone-300" />
+                          profile.avatar_url ? (
+                            <img 
+                              src={profile.avatar_url} 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <Wallet className="w-8 h-8 text-stone-300" />
+                          )
                         ) : (
-                          partner.avatar_url ? <img src={partner.avatar_url} className="w-full h-full object-cover" /> : <Wallet className="w-8 h-8 text-stone-300" />
+                          partner.avatar_url ? (
+                            <img 
+                              src={partner.avatar_url} 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <Wallet className="w-8 h-8 text-stone-300" />
+                          )
                         )}
                       </div>
                       <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">ผู้โอน</span>
@@ -182,9 +198,25 @@ export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, on
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-16 h-16 rounded-2xl bg-white shadow-sm border border-stone-100 flex items-center justify-center overflow-hidden">
                         {!isMePaying ? (
-                          profile.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <Wallet className="w-8 h-8 text-stone-300" />
+                          profile.avatar_url ? (
+                            <img 
+                              src={profile.avatar_url} 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <Wallet className="w-8 h-8 text-stone-300" />
+                          )
                         ) : (
-                          partner.avatar_url ? <img src={partner.avatar_url} className="w-full h-full object-cover" /> : <Wallet className="w-8 h-8 text-stone-300" />
+                          partner.avatar_url ? (
+                            <img 
+                              src={partner.avatar_url} 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <Wallet className="w-8 h-8 text-stone-300" />
+                          )
                         )}
                       </div>
                       <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">ผู้รับ</span>
