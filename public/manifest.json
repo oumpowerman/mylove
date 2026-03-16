@@ -1,0 +1,17 @@
+{
+  "name": "HoneyMoney | หารตังกับแฟน 💖",
+  "short_name": "HoneyMoney",
+  "description": "แอปหารค่าใช้จ่ายสำหรับคู่รัก ตะมุตะมิที่สุดในโลก",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F5F0",
+  "theme_color": "#10B981",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/802/802276.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

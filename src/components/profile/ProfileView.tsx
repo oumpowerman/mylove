@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Profile } from '@/src/types';
 import { GlassCard } from '../ui/GlassCard';
 import { BouncyButton } from '../ui/BouncyButton';
-import { ChevronLeft, LogOut, User, Heart, Edit2, Check, X, Camera, Loader2 } from 'lucide-react';
+import { ChevronLeft, LogOut, User, Heart, Edit2, Check, X, Camera, Loader2, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '@/src/lib/supabase';
 import { GoogleDriveService } from '@/src/services/googleDriveService';
 import { cn } from '@/src/lib/utils';
 
-export const ProfileView = ({ profile, partner, onLogout, onBack }: { key?: React.Key, profile: Profile, partner: Profile, onLogout: () => void, onBack: () => void }) => {
+export const ProfileView = ({ profile, partner, onLogout, onBack, onSettings }: { key?: React.Key, profile: Profile, partner: Profile, onLogout: () => void, onBack: () => void, onSettings: () => void }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(profile.display_name || '');
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
@@ -102,15 +102,26 @@ export const ProfileView = ({ profile, partner, onLogout, onBack }: { key?: Reac
           </BouncyButton>
           <h2 className="text-3xl font-display text-stone-800">โปรไฟล์ ✨</h2>
         </div>
-        {!isEditing && (
-          <BouncyButton 
-            variant="ghost" 
-            onClick={() => setIsEditing(true)}
-            className="p-2 rounded-full text-emerald-500 hover:bg-emerald-50"
-          >
-            <Edit2 className="w-5 h-5" />
-          </BouncyButton>
-        )}
+        <div className="flex items-center gap-2">
+          {!isEditing && (
+            <BouncyButton 
+              variant="ghost" 
+              onClick={onSettings}
+              className="p-2 rounded-full text-stone-400 hover:bg-stone-50"
+            >
+              <Settings className="w-5 h-5" />
+            </BouncyButton>
+          )}
+          {!isEditing && (
+            <BouncyButton 
+              variant="ghost" 
+              onClick={() => setIsEditing(true)}
+              className="p-2 rounded-full text-emerald-500 hover:bg-emerald-50"
+            >
+              <Edit2 className="w-5 h-5" />
+            </BouncyButton>
+          )}
+        </div>
       </div>
 
       <GlassCard className="p-10 space-y-10 border-none">

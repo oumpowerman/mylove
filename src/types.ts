@@ -4,6 +4,7 @@ export interface Profile {
   display_name: string | null;
   partner_id: string | null;
   avatar_url: string | null;
+  app_icon_url?: string | null;
 }
 
 export interface Expense {

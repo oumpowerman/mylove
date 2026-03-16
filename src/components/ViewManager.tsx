@@ -23,6 +23,7 @@ import { ExpenseForm } from './expense/ExpenseForm';
 import { HistoryView } from './history/HistoryView';
 import { ProfileView } from './profile/ProfileView';
 import { ChatView } from './chat/ChatView';
+import { SettingsView } from './settings/SettingsView';
 import { SettleUpModal } from './settlement/SettleUpModal';
 
 const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
@@ -48,7 +49,7 @@ export const ViewManager = () => {
   const { expenses, fetchExpenses, deleteExpense, calculateBalance } = useExpenses();
   const { showDialog, hideDialog } = useDialog();
   
-  const [view, setView] = useState<'dashboard' | 'add' | 'history' | 'profile' | 'chat'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'add' | 'history' | 'profile' | 'chat' | 'settings'>('dashboard');
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [authScreenLoading, setAuthScreenLoading] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
@@ -228,6 +229,7 @@ export const ViewManager = () => {
                   partner={partner!} 
                   onLogout={handleLogout} 
                   onBack={() => setView('dashboard')} 
+                  onSettings={() => setView('settings')}
                 />
               )}
               {view === 'chat' && (
@@ -236,6 +238,13 @@ export const ViewManager = () => {
                   profile={profile!} 
                   partner={partner!} 
                   onBack={() => setView('dashboard')}
+                />
+              )}
+              {view === 'settings' && (
+                <SettingsView 
+                  key="settings"
+                  profile={profile!}
+                  onBack={() => setView('profile')}
                 />
               )}
             </>

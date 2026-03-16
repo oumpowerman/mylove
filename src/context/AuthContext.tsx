@@ -155,6 +155,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user?.id, profile?.partner_id, fetchPartner]);
 
+  // Global App Icon Sync
+  useEffect(() => {
+    const updateAppleTouchIcon = (url: string) => {
+      let link = document.querySelector("link[rel*='apple-touch-icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'apple-touch-icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = url;
+    };
+
+    // 1. Initial load from LocalStorage (Fastest)
+    const cachedIcon = localStorage.getItem('honey_money_app_icon');
+    if (cachedIcon) {
+      updateAppleTouchIcon(cachedIcon);
+    }
+
+    // 2. Load from Profile (Source of truth)
+    if (profile?.app_icon_url) {
+      updateAppleTouchIcon(profile.app_icon_url);
+      localStorage.setItem('honey_money_app_icon', profile.app_icon_url);
+    } else if (profile && !profile.app_icon_url && cachedIcon) {
+      // If DB is empty but we have cache, it might have been reset on another device
+      // or we should keep the cache. For consistency, if DB is explicitly null, reset.
+      const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/802/802276.png';
+      updateAppleTouchIcon(defaultIcon);
+      localStorage.removeItem('honey_money_app_icon');
+    }
+  }, [profile?.app_icon_url, profile]);
   const logout = async () => {
     await supabase.auth.signOut();
   };

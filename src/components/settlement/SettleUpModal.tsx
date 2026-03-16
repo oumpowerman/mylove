@@ -6,6 +6,7 @@ import { BouncyButton } from '../ui/BouncyButton';
 import { X, CheckCircle2, Loader2, Wallet, ArrowRight, Camera, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleDriveService } from '@/src/services/googleDriveService';
+import { cn } from '@/src/lib/utils';
 
 interface SettleUpModalProps {
   profile: Profile;
@@ -19,6 +20,8 @@ interface SettleUpModalProps {
 export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, onClose, onSuccess }: SettleUpModalProps) => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'confirm' | 'success'>('confirm');
+  const [settleType, setSettleType] = useState<'full' | 'partial'>('full');
+  const [partialAmount, setPartialAmount] = useState('');
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [gdStatus, setGdStatus] = useState<'idle' | 'authenticating' | 'authenticated' | 'error'>(
@@ -58,7 +61,15 @@ export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, on
   const handleSettle = async () => {
     setLoading(true);
     try {
-      const amount = Math.abs(balance.netBalance);
+      const isFull = settleType === 'full';
+      const amount = isFull ? Math.abs(balance.netBalance) : parseFloat(partialAmount);
+      
+      if (!isFull && (isNaN(amount) || amount <= 0)) {
+        alert('กรุณาระบุจำนวนเงินที่ถูกต้องน้าา');
+        setLoading(false);
+        return;
+      }
+
       const fromId = balance.netBalance < 0 ? profile.id : partner.id;
       const toId = balance.netBalance < 0 ? partner.id : profile.id;
 
@@ -82,38 +93,54 @@ export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, on
         }
       }
 
-      // 1. Create settlement record
-      const { data: settlement, error: settleError } = await supabase
-        .from('settlements')
-        .insert({
-          from_user_id: fromId,
-          to_user_id: toId,
+      if (isFull) {
+        // 1. Create settlement record
+        const { data: settlement, error: settleError } = await supabase
+          .from('settlements')
+          .insert({
+            from_user_id: fromId,
+            to_user_id: toId,
+            amount: amount,
+            notes: `เคลียร์ยอด ฿${amount.toLocaleString()}`,
+            proof_url: proofUrl
+          })
+          .select()
+          .single();
+
+        if (settleError) throw settleError;
+
+        // 2. Update all unsettled expenses
+        const expenseIds = unsettledExpenses.map(e => e.id);
+        const { error: updateError } = await supabase
+          .from('expenses')
+          .update({ 
+            is_settled: true,
+            settlement_id: settlement.id
+          })
+          .in('id', expenseIds);
+
+        if (updateError) throw updateError;
+      } else {
+        // Partial Payment: Create a new expense entry that acts as a credit
+        // The person who owes money "pays" the other person the partial amount
+        const { error: partialError } = await supabase.from('expenses').insert({
+          payer_id: fromId,
           amount: amount,
-          notes: `เคลียร์ยอด ฿${amount.toLocaleString()}`,
-          proof_url: proofUrl
-        })
-        .select()
-        .single();
+          description: '💰 โอนเงินคืนบางส่วน',
+          notes: `โอนคืนบางส่วน ฿${amount.toLocaleString()}`,
+          receipt_url: proofUrl,
+          other_user_id: toId,
+          other_share: amount // The other person "owes" this back, effectively reducing the net balance
+        });
 
-      if (settleError) throw settleError;
-
-      // 2. Update all unsettled expenses
-      const expenseIds = unsettledExpenses.map(e => e.id);
-      const { error: updateError } = await supabase
-        .from('expenses')
-        .update({ 
-          is_settled: true,
-          settlement_id: settlement.id
-        })
-        .in('id', expenseIds);
-
-      if (updateError) throw updateError;
+        if (partialError) throw partialError;
+      }
 
       // 3. Send notification to chat
       await supabase.from('messages').insert({
         sender_id: profile.id,
         receiver_id: partner.id,
-        content: `💸 [ระบบ] ${profile.display_name} ได้เคลียร์ยอด ฿${amount.toLocaleString()} เรียบร้อยแล้วน้าา${proofUrl ? ' (มีแนบหลักฐานด้วยจ้า)' : ''}`,
+        content: `💸 [ระบบ] ${profile.display_name} ได้${isFull ? 'เคลียร์ยอด' : 'โอนคืนบางส่วน'} ฿${amount.toLocaleString()} เรียบร้อยแล้วน้าา${proofUrl ? ' (มีแนบหลักฐานด้วยจ้า)' : ''}`,
       });
 
       setStep('success');
@@ -190,7 +217,12 @@ export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, on
                           )
                         )}
                       </div>
-                      <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">ผู้โอน</span>
+                      <div className="text-center">
+                        <p className="text-xs font-bold text-stone-700 truncate max-w-[80px]">
+                          {isMePaying ? 'คุณ' : (partner.display_name || 'แฟน')}
+                        </p>
+                        <p className="text-[8px] font-bold text-stone-400 uppercase tracking-widest">ผู้โอน</p>
+                      </div>
                     </div>
 
                     <ArrowRight className="w-8 h-8 text-emerald-400 animate-pulse" />
@@ -219,21 +251,71 @@ export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, on
                           )
                         )}
                       </div>
-                      <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">ผู้รับ</span>
+                      <div className="text-center">
+                        <p className="text-xs font-bold text-stone-700 truncate max-w-[80px]">
+                          {!isMePaying ? 'คุณ' : (partner.display_name || 'แฟน')}
+                        </p>
+                        <p className="text-[8px] font-bold text-stone-400 uppercase tracking-widest">ผู้รับ</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="py-6">
-                    <p className="text-stone-400 font-sans text-sm mb-1">ยอดที่ต้องเคลียร์ทั้งหมด</p>
-                    <h3 className="text-5xl font-display text-emerald-500 tracking-tighter">
-                      ฿{Math.abs(balance.netBalance).toLocaleString()}
-                    </h3>
+                  <div className="py-6 space-y-6">
+                    <div className="space-y-2">
+                      <p className="text-stone-400 font-sans text-sm">เลือกรูปแบบการเคลียร์</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button 
+                          onClick={() => setSettleType('full')}
+                          className={cn(
+                            "py-3 rounded-2xl font-display text-sm border-2 transition-all",
+                            settleType === 'full' ? "bg-emerald-400 text-white border-emerald-400 shadow-lg shadow-emerald-100" : "bg-white/50 text-stone-400 border-white"
+                          )}
+                        >
+                          เคลียร์ทั้งหมด
+                        </button>
+                        <button 
+                          onClick={() => setSettleType('partial')}
+                          className={cn(
+                            "py-3 rounded-2xl font-display text-sm border-2 transition-all",
+                            settleType === 'partial' ? "bg-emerald-400 text-white border-emerald-400 shadow-lg shadow-emerald-100" : "bg-white/50 text-stone-400 border-white"
+                          )}
+                        >
+                          โอนบางส่วน
+                        </button>
+                      </div>
+                    </div>
+
+                    {settleType === 'full' ? (
+                      <div>
+                        <p className="text-stone-400 font-sans text-sm mb-1">ยอดที่ต้องเคลียร์ทั้งหมด</p>
+                        <h3 className="text-5xl font-display text-emerald-500 tracking-tighter">
+                          ฿{Math.abs(balance.netBalance).toLocaleString()}
+                        </h3>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-stone-400 font-sans text-sm mb-1">ระบุจำนวนเงินที่โอน</p>
+                        <div className="relative">
+                          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-stone-400 font-display text-2xl">฿</span>
+                          <input 
+                            type="number" 
+                            value={partialAmount}
+                            onChange={(e) => setPartialAmount(e.target.value)}
+                            className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/50 border border-white focus:outline-none focus:ring-4 focus:ring-emerald-400/10 focus:border-emerald-400 transition-all text-3xl font-display"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest text-left ml-2">
+                          ยอดค้างทั้งหมด: ฿{Math.abs(balance.netBalance).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-stone-500 font-sans text-sm bg-stone-50 p-4 rounded-2xl border border-stone-100">
                     {isMePaying 
-                      ? `คุณต้องโอนเงินให้ ${partner.display_name} จำนวน ฿${Math.abs(balance.netBalance).toLocaleString()} เมื่อโอนแล้วให้กดปุ่มด้านล่างเพื่อรีเซ็ตยอดน้าา`
-                      : `${partner.display_name} ต้องโอนเงินให้คุณ จำนวน ฿${Math.abs(balance.netBalance).toLocaleString()} เมื่อได้รับเงินแล้วให้กดปุ่มด้านล่างเพื่อรีเซ็ตยอดน้าา`
+                      ? `คุณต้องโอนเงินให้ ${partner.display_name} จำนวน ฿${(settleType === 'full' ? Math.abs(balance.netBalance) : (parseFloat(partialAmount) || 0)).toLocaleString()} เมื่อโอนแล้วให้กดปุ่มด้านล่างเพื่อบันทึกยอดน้าา`
+                      : `${partner.display_name} ต้องโอนเงินให้คุณ จำนวน ฿${(settleType === 'full' ? Math.abs(balance.netBalance) : (parseFloat(partialAmount) || 0)).toLocaleString()} เมื่อได้รับเงินแล้วให้กดปุ่มด้านล่างเพื่อบันทึกยอดน้าา`
                     }
                   </p>
 
@@ -312,8 +394,8 @@ export const SettleUpModal = ({ profile, partner, balance, unsettledExpenses, on
                   <CheckCircle2 className="w-12 h-12" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-display text-stone-800">เคลียร์ยอดสำเร็จ! ✨</h2>
-                  <p className="text-stone-500 font-sans mt-2">ยอดเงินถูกรีเซ็ตเรียบร้อยแล้วจ้าา</p>
+                  <h2 className="text-3xl font-display text-stone-800">{settleType === 'full' ? 'เคลียร์ยอดสำเร็จ! ✨' : 'บันทึกยอดโอนสำเร็จ! ✨'}</h2>
+                  <p className="text-stone-500 font-sans mt-2">{settleType === 'full' ? 'ยอดเงินถูกรีเซ็ตเรียบร้อยแล้วจ้าา' : 'ยอดค้างจะถูกหักลบออกให้โดยอัตโนมัติน้าา'}</p>
                 </div>
               </motion.div>
             )}
