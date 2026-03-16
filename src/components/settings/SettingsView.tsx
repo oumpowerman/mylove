@@ -38,18 +38,73 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
     const savedIcon = profile.app_icon_url || partner?.app_icon_url || localStorage.getItem('honey_money_app_icon');
     if (savedIcon) {
       setCurrentIcon(savedIcon);
-      updateAppleTouchIcon(savedIcon);
+      updateAppIcons(savedIcon);
     }
   }, [profile.app_icon_url, partner?.app_icon_url]);
 
-  const updateAppleTouchIcon = (url: string) => {
-    let link = document.querySelector("link[rel*='apple-touch-icon']") as HTMLLinkElement;
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'apple-touch-icon';
-      document.getElementsByTagName('head')[0].appendChild(link);
+  const updateAppIcons = (url: string) => {
+    // 1. Update Apple Touch Icon (iOS & many Android fallbacks)
+    let appleLink = document.querySelector("link[rel*='apple-touch-icon']") as HTMLLinkElement;
+    if (!appleLink) {
+      appleLink = document.createElement('link');
+      appleLink.rel = 'apple-touch-icon';
+      document.head.appendChild(appleLink);
     }
-    link.href = url;
+    appleLink.href = url;
+
+    // 2. Update Standard Favicons (Android/Samsung/Browsers)
+    const iconRels = ['icon', 'shortcut icon', 'fluid-icon'];
+    iconRels.forEach(rel => {
+      let link = document.querySelector(`link[rel='${rel}']`) as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = url;
+    });
+
+    // 3. Update Windows/IE Tile (Used by some Android launchers)
+    let msTile = document.querySelector("meta[name='msapplication-TileImage']") as HTMLMetaElement;
+    if (!msTile) {
+      msTile = document.createElement('meta');
+      msTile.name = 'msapplication-TileImage';
+      document.head.appendChild(msTile);
+    }
+    msTile.content = url;
+
+    // 4. Dynamic Manifest for Android PWA (Chrome, Samsung Internet, Edge)
+    const manifest = {
+      name: "HoneyMoney | หารตังกับแฟน 💖",
+      short_name: "HoneyMoney",
+      description: "แอปหารค่าใช้จ่ายสำหรับคู่รัก ตะมุตะมิที่สุดในโลก",
+      start_url: window.location.origin,
+      display: "standalone",
+      background_color: "#F5F5F0",
+      theme_color: "#10B981",
+      icons: [
+        {
+          src: url,
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any"
+        },
+        {
+          src: url,
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any maskable"
+        }
+      ]
+    };
+    
+    let manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
+    if (manifestLink) {
+      const stringManifest = JSON.stringify(manifest);
+      const blob = new Blob([stringManifest], {type: 'application/json'});
+      const manifestUrl = URL.createObjectURL(blob);
+      manifestLink.href = manifestUrl;
+    }
   };
 
   const handleConnectGD = async () => {
@@ -155,7 +210,7 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
         console.warn('LocalStorage quota exceeded, icon will only be saved to database.');
       }
       setCurrentIcon(finalUrl);
-      updateAppleTouchIcon(finalUrl);
+      updateAppIcons(finalUrl);
       setIsCropping(false);
       setImage(null);
       
@@ -197,7 +252,7 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
         console.warn('LocalStorage quota exceeded, icon will only be saved to database.');
       }
       setCurrentIcon(finalUrl);
-      updateAppleTouchIcon(finalUrl);
+      updateAppIcons(finalUrl);
       setShowManualInput(false);
       setManualUrl('');
       alert('บันทึกไอคอนจากลิงก์เรียบร้อยแล้วจ้า! ✨' + (finalUrl !== manualUrl ? ' (ระบบแปลงลิงก์ Google Drive ให้เป็นรูปภาพให้แล้วน้าา)' : ''));
@@ -220,7 +275,7 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
       setCurrentIcon(null);
       
       const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/802/802276.png';
-      updateAppleTouchIcon(defaultIcon);
+      updateAppIcons(defaultIcon);
       alert('รีเซ็ตไอคอนเป็นค่าเริ่มต้นแล้วจ้า 🍯');
     } catch (e) {
       console.error(e);
@@ -348,14 +403,26 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
 
         <div className="p-6 bg-stone-50 rounded-[2rem] border border-stone-100 space-y-4">
           <h4 className="text-sm font-bold text-stone-700 flex items-center gap-2">
-            <Check className="w-4 h-4 text-emerald-500" /> วิธีเปลี่ยนไอคอนบน iPhone:
+            <Check className="w-4 h-4 text-emerald-500" /> วิธีเปลี่ยนไอคอนบนมือถือ:
           </h4>
-          <ol className="text-xs text-stone-500 space-y-2 list-decimal list-inside font-sans">
-            <li>เลือกรูปและกดบันทึกให้เรียบร้อย</li>
-            <li>กดปุ่ม <span className="font-bold text-stone-700">Share</span> ใน Safari</li>
-            <li>เลือก <span className="font-bold text-stone-700">"Add to Home Screen"</span></li>
-            <li>รูปที่คุณเลือกจะกลายเป็นไอคอนแอปทันที! ✨</li>
-          </ol>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">สำหรับ iPhone (iOS):</p>
+              <ol className="text-xs text-stone-500 space-y-1 list-decimal list-inside font-sans">
+                <li>เลือกรูปและกดบันทึกให้เรียบร้อย</li>
+                <li>กดปุ่ม <span className="font-bold text-stone-700">Share</span> ใน Safari</li>
+                <li>เลือก <span className="font-bold text-stone-700">"Add to Home Screen"</span></li>
+              </ol>
+            </div>
+            <div className="space-y-2 border-t border-stone-200 pt-3">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">สำหรับ Android:</p>
+              <ol className="text-xs text-stone-500 space-y-1 list-decimal list-inside font-sans">
+                <li>เลือกรูปและกดบันทึกให้เรียบร้อย</li>
+                <li>กดปุ่ม <span className="font-bold text-stone-700">จุด 3 จุด</span> มุมขวาบนของ Chrome</li>
+                <li>เลือก <span className="font-bold text-stone-700">"Install app"</span> หรือ <span className="font-bold text-stone-700">"Add to Home screen"</span></li>
+              </ol>
+            </div>
+          </div>
         </div>
       </GlassCard>
 

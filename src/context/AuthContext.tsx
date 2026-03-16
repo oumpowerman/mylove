@@ -157,27 +157,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Global App Icon Sync
   useEffect(() => {
-    const updateAppleTouchIcon = (url: string) => {
-      let link = document.querySelector("link[rel*='apple-touch-icon']") as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'apple-touch-icon';
-        document.getElementsByTagName('head')[0].appendChild(link);
+    const updateAppIcons = (url: string) => {
+      // 1. Update Apple Touch Icon (iOS & many Android fallbacks)
+      let appleLink = document.querySelector("link[rel*='apple-touch-icon']") as HTMLLinkElement;
+      if (!appleLink) {
+        appleLink = document.createElement('link');
+        appleLink.rel = 'apple-touch-icon';
+        document.head.appendChild(appleLink);
       }
-      link.href = url;
+      appleLink.href = url;
+
+      // 2. Update Standard Favicons (Android/Samsung/Browsers)
+      const iconRels = ['icon', 'shortcut icon', 'fluid-icon'];
+      iconRels.forEach(rel => {
+        let link = document.querySelector(`link[rel='${rel}']`) as HTMLLinkElement;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = rel;
+          document.head.appendChild(link);
+        }
+        link.href = url;
+      });
+
+      // 3. Update Windows/IE Tile (Used by some Android launchers)
+      let msTile = document.querySelector("meta[name='msapplication-TileImage']") as HTMLMetaElement;
+      if (!msTile) {
+        msTile = document.createElement('meta');
+        msTile.name = 'msapplication-TileImage';
+        document.head.appendChild(msTile);
+      }
+      msTile.content = url;
+
+      // 4. Dynamic Manifest for Android PWA (Chrome, Samsung Internet, Edge)
+      const manifest = {
+        name: "HoneyMoney | หารตังกับแฟน 💖",
+        short_name: "HoneyMoney",
+        description: "แอปหารค่าใช้จ่ายสำหรับคู่รัก ตะมุตะมิที่สุดในโลก",
+        start_url: window.location.origin,
+        display: "standalone",
+        background_color: "#F5F5F0",
+        theme_color: "#10B981",
+        icons: [
+          {
+            src: url,
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any"
+          },
+          {
+            src: url,
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable"
+          }
+        ]
+      };
+      
+      let manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
+      if (manifestLink) {
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestUrl = URL.createObjectURL(blob);
+        manifestLink.href = manifestUrl;
+      }
     };
 
     // 1. Initial load from LocalStorage (Fastest)
     const cachedIcon = localStorage.getItem('honey_money_app_icon');
     if (cachedIcon) {
-      updateAppleTouchIcon(cachedIcon);
+      updateAppIcons(cachedIcon);
     }
 
     // 2. Load from Profile or Partner (Shared Icon)
     const effectiveIcon = profile?.app_icon_url || partner?.app_icon_url;
     
     if (effectiveIcon) {
-      updateAppleTouchIcon(effectiveIcon);
+      updateAppIcons(effectiveIcon);
       try {
         localStorage.setItem('honey_money_app_icon', effectiveIcon);
       } catch (e) {
@@ -186,7 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (profile && profile.app_icon_url === null && (!partner || partner.app_icon_url === null) && cachedIcon) {
       // Only reset if explicitly set to null in both (or partner is null)
       const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/802/802276.png';
-      updateAppleTouchIcon(defaultIcon);
+      updateAppIcons(defaultIcon);
       localStorage.removeItem('honey_money_app_icon');
     }
   }, [profile?.app_icon_url, partner?.app_icon_url, profile, partner]);
