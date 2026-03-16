@@ -12,10 +12,11 @@ import { Profile } from '@/src/types';
 interface SettingsViewProps {
   key?: React.Key;
   profile: Profile;
+  partner: Profile;
   onBack: () => void;
 }
 
-export const SettingsView = ({ profile, onBack }: SettingsViewProps) => {
+export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) => {
   const [image, setImage] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -33,13 +34,13 @@ export const SettingsView = ({ profile, onBack }: SettingsViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Priority: Database > LocalStorage > Default
-    const savedIcon = profile.app_icon_url || localStorage.getItem('honey_money_app_icon');
+    // Priority: Database (Mine) > Database (Partner) > LocalStorage > Default
+    const savedIcon = profile.app_icon_url || partner?.app_icon_url || localStorage.getItem('honey_money_app_icon');
     if (savedIcon) {
       setCurrentIcon(savedIcon);
       updateAppleTouchIcon(savedIcon);
     }
-  }, [profile.app_icon_url]);
+  }, [profile.app_icon_url, partner?.app_icon_url]);
 
   const updateAppleTouchIcon = (url: string) => {
     let link = document.querySelector("link[rel*='apple-touch-icon']") as HTMLLinkElement;

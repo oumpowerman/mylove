@@ -173,19 +173,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateAppleTouchIcon(cachedIcon);
     }
 
-    // 2. Load from Profile (Source of truth)
-    // Use hasOwnProperty or check for undefined to distinguish between "column missing" and "explicitly null"
-    if (profile && profile.app_icon_url) {
-      updateAppleTouchIcon(profile.app_icon_url);
-      localStorage.setItem('honey_money_app_icon', profile.app_icon_url);
-    } else if (profile && profile.app_icon_url === null && cachedIcon) {
-      // Only reset if explicitly set to null in DB
+    // 2. Load from Profile or Partner (Shared Icon)
+    const effectiveIcon = profile?.app_icon_url || partner?.app_icon_url;
+    
+    if (effectiveIcon) {
+      updateAppleTouchIcon(effectiveIcon);
+      localStorage.setItem('honey_money_app_icon', effectiveIcon);
+    } else if (profile && profile.app_icon_url === null && (!partner || partner.app_icon_url === null) && cachedIcon) {
+      // Only reset if explicitly set to null in both (or partner is null)
       const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/802/802276.png';
       updateAppleTouchIcon(defaultIcon);
       localStorage.removeItem('honey_money_app_icon');
     }
-    // If profile.app_icon_url is undefined, we keep the cached version
-  }, [profile?.app_icon_url, profile]);
+  }, [profile?.app_icon_url, partner?.app_icon_url, profile, partner]);
   const logout = async () => {
     await supabase.auth.signOut();
   };

@@ -244,6 +244,7 @@ export const ViewManager = () => {
                 <SettingsView 
                   key="settings"
                   profile={profile!}
+                  partner={partner!}
                   onBack={() => setView('profile')}
                 />
               )}
