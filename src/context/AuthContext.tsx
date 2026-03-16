@@ -174,16 +174,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 2. Load from Profile (Source of truth)
-    if (profile?.app_icon_url) {
+    // Use hasOwnProperty or check for undefined to distinguish between "column missing" and "explicitly null"
+    if (profile && profile.app_icon_url) {
       updateAppleTouchIcon(profile.app_icon_url);
       localStorage.setItem('honey_money_app_icon', profile.app_icon_url);
-    } else if (profile && !profile.app_icon_url && cachedIcon) {
-      // If DB is empty but we have cache, it might have been reset on another device
-      // or we should keep the cache. For consistency, if DB is explicitly null, reset.
+    } else if (profile && profile.app_icon_url === null && cachedIcon) {
+      // Only reset if explicitly set to null in DB
       const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/802/802276.png';
       updateAppleTouchIcon(defaultIcon);
       localStorage.removeItem('honey_money_app_icon');
     }
+    // If profile.app_icon_url is undefined, we keep the cached version
   }, [profile?.app_icon_url, profile]);
   const logout = async () => {
     await supabase.auth.signOut();

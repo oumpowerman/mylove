@@ -131,10 +131,18 @@ export const SettingsView = ({ profile, onBack }: SettingsViewProps) => {
       }
 
       // Save to Supabase (so partner sees it too)
-      await supabase
+      const { error: dbError } = await supabase
         .from('profiles')
         .update({ app_icon_url: finalUrl })
         .eq('id', profile.id);
+
+      if (dbError) {
+        console.error('Database update error:', dbError);
+        // If column is missing, we still want it to work locally
+        if (dbError.code === 'PGRST204' || dbError.message.includes('column')) {
+          console.warn('app_icon_url column might be missing in profiles table.');
+        }
+      }
 
       localStorage.setItem('honey_money_app_icon', finalUrl);
       setCurrentIcon(finalUrl);
@@ -165,10 +173,14 @@ export const SettingsView = ({ profile, onBack }: SettingsViewProps) => {
         finalUrl = `https://lh3.googleusercontent.com/d/${match[1]}`;
       }
 
-      await supabase
+      const { error: dbError } = await supabase
         .from('profiles')
         .update({ app_icon_url: finalUrl })
         .eq('id', profile.id);
+
+      if (dbError) {
+        console.error('Database update error:', dbError);
+      }
 
       localStorage.setItem('honey_money_app_icon', finalUrl);
       setCurrentIcon(finalUrl);
