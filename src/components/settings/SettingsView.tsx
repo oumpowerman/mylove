@@ -95,8 +95,11 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
 
     if (!ctx) return '';
 
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
+    // Standard Apple Touch Icon size is 180x180, but we'll use 512x512 for high quality
+    // while keeping base64 size manageable.
+    const targetSize = 512;
+    canvas.width = targetSize;
+    canvas.height = targetSize;
 
     ctx.drawImage(
       image,
@@ -106,11 +109,12 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
       pixelCrop.height,
       0,
       0,
-      pixelCrop.width,
-      pixelCrop.height
+      targetSize,
+      targetSize
     );
 
-    return canvas.toDataURL('image/png');
+    // Use jpeg with 0.8 quality to significantly reduce base64 size compared to png
+    return canvas.toDataURL('image/jpeg', 0.8);
   };
 
   const handleSaveIcon = async () => {
@@ -145,7 +149,11 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
         }
       }
 
-      localStorage.setItem('honey_money_app_icon', finalUrl);
+      try {
+        localStorage.setItem('honey_money_app_icon', finalUrl);
+      } catch (e) {
+        console.warn('LocalStorage quota exceeded, icon will only be saved to database.');
+      }
       setCurrentIcon(finalUrl);
       updateAppleTouchIcon(finalUrl);
       setIsCropping(false);
@@ -183,7 +191,11 @@ export const SettingsView = ({ profile, partner, onBack }: SettingsViewProps) =>
         console.error('Database update error:', dbError);
       }
 
-      localStorage.setItem('honey_money_app_icon', finalUrl);
+      try {
+        localStorage.setItem('honey_money_app_icon', finalUrl);
+      } catch (e) {
+        console.warn('LocalStorage quota exceeded, icon will only be saved to database.');
+      }
       setCurrentIcon(finalUrl);
       updateAppleTouchIcon(finalUrl);
       setShowManualInput(false);

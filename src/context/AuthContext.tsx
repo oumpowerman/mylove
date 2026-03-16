@@ -178,7 +178,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (effectiveIcon) {
       updateAppleTouchIcon(effectiveIcon);
-      localStorage.setItem('honey_money_app_icon', effectiveIcon);
+      try {
+        localStorage.setItem('honey_money_app_icon', effectiveIcon);
+      } catch (e) {
+        console.warn('LocalStorage quota exceeded in AuthContext sync');
+      }
     } else if (profile && profile.app_icon_url === null && (!partner || partner.app_icon_url === null) && cachedIcon) {
       // Only reset if explicitly set to null in both (or partner is null)
       const defaultIcon = 'https://cdn-icons-png.flaticon.com/512/802/802276.png';
